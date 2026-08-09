@@ -4,11 +4,13 @@ version = "0.1.0-dev"
 edition = "2021"
 license = "MIT"
 authors = ["zevs"]
-description = "RAII wrappers over Win32 process/thread tokens: OpenProcessToken, DuplicateTokenEx, ImpersonateLoggedOnUser, AdjustTokenPrivileges. Drop = RevertToSelf."
+description = "RAII wrappers over Win32 process/thread tokens: OpenProcessToken, DuplicateTokenEx, ImpersonateLoggedOnUser, AdjustTokenPrivileges. Drop = RevertToSelf"
 repository = "https://github.com/icedracon/windows-token"
+homepage = "https://github.com/icedracon/windows-token"
+documentation = "https://docs.rs/windows-token"
 readme = "README.md"
-keywords = ["windows", "token", "impersonation", "privilege", "security"]
-categories = ["os::windows-apis", "authentication"]
+keywords = ["windows", "token", "impersonation", "privilege", "raii"]
+categories = ["os::windows-apis", "authentication", "api-bindings"]
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [
