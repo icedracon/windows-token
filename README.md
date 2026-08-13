@@ -8,7 +8,7 @@ RAII wrappers over the Win32 access-token surface — `OpenProcessToken`,
 `DuplicateTokenEx`, `ImpersonateLoggedOnUser`, `SetThreadToken`,
 `AdjustTokenPrivileges`. The single hard invariant: dropping an
 `ImpersonationGuard` calls `RevertToSelf` — always, including on unwind.
-Hand-written impersonation code (Rubeus-style) forgets this on early returns;
+Hand-written impersonation code (popular Kerberos clients-style) forgets this on early returns;
 here it is structurally impossible.
 
 ## Status
@@ -90,7 +90,7 @@ runtime.
   Control Manager wrapper, for the SYSTEM-side of the same workflows.
 
 Together these enable "run adhammer as yourself" and impersonation-based
-lateral-movement tooling without dragging in Impacket or Rubeus.
+lateral-movement tooling without dragging in spec-vector captures or popular Kerberos clients.
 
 ## License
 
