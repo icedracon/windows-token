@@ -3,7 +3,7 @@
 //! avoids `ConvertSidToStringSidW` to keep the feature list narrow.
 
 use crate::error::{Error, Result};
-use windows::Win32::Security::{
+use win32_min::security_token::{
     GetLengthSid, GetSidIdentifierAuthority, GetSidSubAuthority, GetSidSubAuthorityCount,
     IsValidSid, PSID,
 };
@@ -18,22 +18,22 @@ impl Sid {
     /// # Safety
     /// `psid` must point to a valid SID for the duration of the call.
     pub(crate) unsafe fn copy_from(psid: PSID) -> Result<Self> {
-        if !IsValidSid(psid).as_bool() {
-            return Err(Error::win32(
-                "IsValidSid",
-                windows_core::Error::from_win32(),
-            ));
+        let valid = unsafe { IsValidSid(psid) };
+        if valid == 0 {
+            return Err(Error::from_last_os_error("IsValidSid"));
         }
-        let len = GetLengthSid(psid) as usize;
+        let len = unsafe { GetLengthSid(psid) } as usize;
         let mut buf = vec![0u8; len];
-        core::ptr::copy_nonoverlapping(psid.0 as *const u8, buf.as_mut_ptr(), len);
+        unsafe {
+            core::ptr::copy_nonoverlapping(psid as *const u8, buf.as_mut_ptr(), len);
+        }
         Ok(Sid(buf))
     }
 
     /// Return the last subauthority (used for integrity-level classification).
     pub fn last_subauthority(&self) -> Option<u32> {
         unsafe {
-            let psid = PSID(self.0.as_ptr() as *mut _);
+            let psid = self.0.as_ptr() as PSID;
             let count_ptr = GetSidSubAuthorityCount(psid);
             if count_ptr.is_null() {
                 return None;
@@ -54,7 +54,7 @@ impl Sid {
     /// Return the number of subauthorities in this SID.
     pub fn subauthority_count(&self) -> u8 {
         unsafe {
-            let psid = PSID(self.0.as_ptr() as *mut _);
+            let psid = self.0.as_ptr() as PSID;
             let count_ptr = GetSidSubAuthorityCount(psid);
             if count_ptr.is_null() {
                 0
@@ -72,7 +72,7 @@ impl Sid {
     /// Format as the canonical `S-R-I-S1-S2-...` string.
     pub fn to_display_string(&self) -> String {
         unsafe {
-            let psid = PSID(self.0.as_ptr() as *mut _);
+            let psid = self.0.as_ptr() as PSID;
             let revision = self.0[0];
             let count_ptr = GetSidSubAuthorityCount(psid);
             let count = if count_ptr.is_null() { 0 } else { *count_ptr };

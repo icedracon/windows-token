@@ -4,12 +4,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("win32 call {op} failed: {source}")]
-    Win32 {
-        op: &'static str,
-        #[source]
-        source: windows_core::Error,
-    },
+    #[error("win32 call {op} failed: 0x{code:08x}")]
+    Win32 { op: &'static str, code: u32 },
 
     #[error("privilege {0:?} not held or could not be adjusted")]
     PrivilegeNotHeld(crate::privilege::Privilege),
@@ -24,7 +20,9 @@ pub enum Error {
 pub type Result<T> = core::result::Result<T, Error>;
 
 impl Error {
-    pub(crate) fn win32(op: &'static str, source: windows_core::Error) -> Self {
-        Error::Win32 { op, source }
+    /// Build an `Error::Win32` from the current thread's `GetLastError()` value.
+    pub(crate) fn from_last_os_error(op: &'static str) -> Self {
+        let code = unsafe { win32_min::foundation::GetLastError() };
+        Error::Win32 { op, code }
     }
 }

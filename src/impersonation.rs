@@ -1,12 +1,11 @@
 //! RAII impersonation guard. `Drop` always calls `RevertToSelf`, including on
 //! unwind — this is the whole point of the wrapper. The single most common
-//! hand-written Rubeus bug is forgetting the revert on early return; here it
-//! is structurally impossible.
+//! hand-written credential-theft-tool bug is forgetting the revert on early
+//! return; here it is structurally impossible.
 
 use crate::error::{Error, Result};
-use windows::Win32::Foundation::HANDLE;
-use windows::Win32::Security::{ImpersonateLoggedOnUser, RevertToSelf};
-use windows::Win32::System::Threading::SetThreadToken;
+use win32_min::foundation::HANDLE;
+use win32_min::security_token::{ImpersonateLoggedOnUser, RevertToSelf, SetThreadToken};
 
 /// RAII guard. While alive the current thread runs under the impersonation
 /// context set at construction. Dropped = `RevertToSelf` called; failures are
@@ -24,9 +23,9 @@ pub struct ImpersonationGuard {
 impl ImpersonationGuard {
     /// Call `ImpersonateLoggedOnUser` on `token` and return a guard.
     pub(crate) fn impersonate_logged_on(token: HANDLE) -> Result<Self> {
-        unsafe {
-            ImpersonateLoggedOnUser(token)
-                .map_err(|e| Error::win32("ImpersonateLoggedOnUser", e))?;
+        let ok = unsafe { ImpersonateLoggedOnUser(token) };
+        if ok == 0 {
+            return Err(Error::from_last_os_error("ImpersonateLoggedOnUser"));
         }
         Ok(ImpersonationGuard {
             _not_send: core::marker::PhantomData,
@@ -38,8 +37,9 @@ impl ImpersonationGuard {
     /// thread directly (as opposed to `ImpersonateLoggedOnUser`, which does a
     /// duplicate-and-attach internally).
     pub(crate) fn set_on_current_thread(token: HANDLE) -> Result<Self> {
-        unsafe {
-            SetThreadToken(None, token).map_err(|e| Error::win32("SetThreadToken", e))?;
+        let ok = unsafe { SetThreadToken(core::ptr::null(), token) };
+        if ok == 0 {
+            return Err(Error::from_last_os_error("SetThreadToken"));
         }
         Ok(ImpersonationGuard {
             _not_send: core::marker::PhantomData,
@@ -52,13 +52,7 @@ impl Drop for ImpersonationGuard {
         // The revert MUST run even during unwind. Failure is logged in debug
         // only — production callers cannot handle a failed revert anyway
         // (thread is in an undefined identity state; abort might be safer).
-        unsafe {
-            let r = RevertToSelf();
-            debug_assert!(
-                r.is_ok(),
-                "RevertToSelf failed in ImpersonationGuard::drop: {:?}",
-                r
-            );
-        }
+        let ok = unsafe { RevertToSelf() };
+        debug_assert!(ok != 0, "RevertToSelf failed in ImpersonationGuard::drop");
     }
 }

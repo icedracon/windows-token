@@ -1,10 +1,10 @@
 [package]
 name = "windows-token"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 authors = ["zevs"]
-description = "RAII wrappers over Win32 process/thread tokens: OpenProcessToken, DuplicateTokenEx, ImpersonateLoggedOnUser, AdjustTokenPrivileges. Drop = RevertToSelf"
+description = "RAII wrappers over Win32 process/thread tokens: OpenProcessToken, DuplicateTokenEx, ImpersonateLoggedOnUser, AdjustTokenPrivileges. Drop = RevertToSelf. Built on win32-min (hand-rolled FFI, no windows-rs)."
 repository = "https://github.com/icedracon/windows-token"
 homepage = "https://github.com/icedracon/windows-token"
 documentation = "https://docs.rs/windows-token"
@@ -13,13 +13,7 @@ keywords = ["windows", "token", "impersonation", "privilege", "raii"]
 categories = ["os::windows-apis", "authentication", "api-bindings"]
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.58", features = [
-    "Win32_Security",
-    "Win32_System_Threading",
-    "Win32_Security_Authentication_Identity",
-    "Win32_Foundation",
-] }
-windows-core = "0.58"
+win32-min = { version = "0.1", features = ["security-token"] }
 thiserror = "2"
 
 [lib]

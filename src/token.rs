@@ -7,14 +7,13 @@ use crate::impersonation::ImpersonationGuard;
 use crate::privilege::{adjust_enable, PrevState, Privilege};
 use crate::sid::{IntegrityLevel, Sid};
 
-use windows::Win32::Foundation::{CloseHandle, HANDLE};
-use windows::Win32::Security::{
-    DuplicateTokenEx, GetTokenInformation, TokenIntegrityLevel, TokenUser,
-    SECURITY_IMPERSONATION_LEVEL, TOKEN_ACCESS_MASK, TOKEN_ADJUST_PRIVILEGES, TOKEN_ALL_ACCESS,
-    TOKEN_DUPLICATE, TOKEN_MANDATORY_LABEL, TOKEN_QUERY, TOKEN_TYPE, TOKEN_USER,
-};
-use windows::Win32::System::Threading::{
-    GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
+use core::ffi::c_void;
+use win32_min::foundation::{CloseHandle, HANDLE};
+use win32_min::security_token::{
+    DuplicateTokenEx, GetCurrentProcess, GetTokenInformation, OpenProcess, OpenProcessToken,
+    SECURITY_IMPERSONATION_LEVEL, TOKEN_INFORMATION_CLASS, TOKEN_MANDATORY_LABEL, TOKEN_TYPE,
+    TOKEN_USER, PROCESS_QUERY_LIMITED_INFORMATION, TOKEN_ADJUST_PRIVILEGES, TOKEN_ALL_ACCESS,
+    TOKEN_DUPLICATE, TOKEN_QUERY,
 };
 
 /// TOKEN_TYPE alias — primary tokens are the ones you can assign to a new
@@ -28,8 +27,8 @@ pub enum TokenType {
 impl TokenType {
     fn as_win32(self) -> TOKEN_TYPE {
         match self {
-            TokenType::Primary => windows::Win32::Security::TokenPrimary,
-            TokenType::Impersonation => windows::Win32::Security::TokenImpersonation,
+            TokenType::Primary => TOKEN_TYPE::TokenPrimary,
+            TokenType::Impersonation => TOKEN_TYPE::TokenImpersonation,
         }
     }
 }
@@ -45,14 +44,17 @@ pub enum SecurityImpersonationLevel {
 
 impl SecurityImpersonationLevel {
     fn as_win32(self) -> SECURITY_IMPERSONATION_LEVEL {
-        use windows::Win32::Security::{
-            SecurityAnonymous, SecurityDelegation, SecurityIdentification, SecurityImpersonation,
-        };
         match self {
-            SecurityImpersonationLevel::Anonymous => SecurityAnonymous,
-            SecurityImpersonationLevel::Identification => SecurityIdentification,
-            SecurityImpersonationLevel::Impersonation => SecurityImpersonation,
-            SecurityImpersonationLevel::Delegation => SecurityDelegation,
+            SecurityImpersonationLevel::Anonymous => SECURITY_IMPERSONATION_LEVEL::SecurityAnonymous,
+            SecurityImpersonationLevel::Identification => {
+                SECURITY_IMPERSONATION_LEVEL::SecurityIdentification
+            }
+            SecurityImpersonationLevel::Impersonation => {
+                SECURITY_IMPERSONATION_LEVEL::SecurityImpersonation
+            }
+            SecurityImpersonationLevel::Delegation => {
+                SECURITY_IMPERSONATION_LEVEL::SecurityDelegation
+            }
         }
     }
 }
@@ -82,7 +84,7 @@ impl Token {
     pub fn into_raw(mut self) -> HANDLE {
         let h = self.handle;
         // Prevent Drop from closing.
-        self.handle = HANDLE::default();
+        self.handle = core::ptr::null_mut();
         h
     }
 
@@ -102,11 +104,11 @@ impl Token {
         )
     }
 
-    pub fn open_current_process_with_access(access: TOKEN_ACCESS_MASK) -> Result<Self> {
-        let mut h = HANDLE::default();
-        unsafe {
-            OpenProcessToken(GetCurrentProcess(), access, &mut h)
-                .map_err(|e| Error::win32("OpenProcessToken(current)", e))?;
+    pub fn open_current_process_with_access(access: u32) -> Result<Self> {
+        let mut h: HANDLE = core::ptr::null_mut();
+        let ok = unsafe { OpenProcessToken(GetCurrentProcess(), access, &mut h) };
+        if ok == 0 {
+            return Err(Error::from_last_os_error("OpenProcessToken(current)"));
         }
         Ok(Token { handle: h })
     }
@@ -116,36 +118,39 @@ impl Token {
     /// Requires `SeDebugPrivilege` on the caller's token for processes not
     /// owned by the caller. Enable it via
     /// `Token::open_current_process()?.enable_privilege(Privilege::SeDebug)?`.
-    pub fn open_process(pid: u32, access: TOKEN_ACCESS_MASK) -> Result<Self> {
-        unsafe {
-            let proc_handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
-                .map_err(|e| Error::win32("OpenProcess", e))?;
-
-            // Ensure the process handle is always closed, even on early return.
-            let _proc_guard = HandleGuard(proc_handle);
-
-            let mut h = HANDLE::default();
-            OpenProcessToken(proc_handle, access, &mut h)
-                .map_err(|e| Error::win32("OpenProcessToken(pid)", e))?;
-            Ok(Token { handle: h })
+    pub fn open_process(pid: u32, access: u32) -> Result<Self> {
+        let proc_handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+        if proc_handle.is_null() {
+            return Err(Error::from_last_os_error("OpenProcess"));
         }
+        // Ensure the process handle is always closed, even on early return.
+        let _proc_guard = HandleGuard(proc_handle);
+
+        let mut h: HANDLE = core::ptr::null_mut();
+        let ok = unsafe { OpenProcessToken(proc_handle, access, &mut h) };
+        if ok == 0 {
+            return Err(Error::from_last_os_error("OpenProcessToken(pid)"));
+        }
+        Ok(Token { handle: h })
     }
 
     /// Duplicate this token. Combine `ty` and `level` to produce either a
     /// primary token (for `CreateProcessAsUserW`) or an impersonation token
     /// (for `SetThreadToken` / `ImpersonateLoggedOnUser`).
     pub fn duplicate(&self, ty: TokenType, level: SecurityImpersonationLevel) -> Result<Token> {
-        let mut new_h = HANDLE::default();
-        unsafe {
+        let mut new_h: HANDLE = core::ptr::null_mut();
+        let ok = unsafe {
             DuplicateTokenEx(
                 self.handle,
                 TOKEN_ALL_ACCESS,
-                None,
+                core::ptr::null(),
                 level.as_win32(),
                 ty.as_win32(),
                 &mut new_h,
             )
-            .map_err(|e| Error::win32("DuplicateTokenEx", e))?;
+        };
+        if ok == 0 {
+            return Err(Error::from_last_os_error("DuplicateTokenEx"));
         }
         Ok(Token { handle: new_h })
     }
@@ -174,7 +179,11 @@ impl Token {
 
     /// `GetTokenInformation(TokenUser)` → owned `Sid`.
     pub fn user_sid(&self) -> Result<Sid> {
-        let buf = get_token_info_var(self.handle, TokenUser, "TokenUser")?;
+        let buf = get_token_info_var(
+            self.handle,
+            TOKEN_INFORMATION_CLASS::TokenUser,
+            "TokenUser",
+        )?;
         if buf.len() < core::mem::size_of::<TOKEN_USER>() {
             return Err(Error::BadTokenInfoSize { class: "TokenUser" });
         }
@@ -186,7 +195,11 @@ impl Token {
 
     /// `GetTokenInformation(TokenIntegrityLevel)` → parsed level.
     pub fn integrity_level(&self) -> Result<IntegrityLevel> {
-        let buf = get_token_info_var(self.handle, TokenIntegrityLevel, "TokenIntegrityLevel")?;
+        let buf = get_token_info_var(
+            self.handle,
+            TOKEN_INFORMATION_CLASS::TokenIntegrityLevel,
+            "TokenIntegrityLevel",
+        )?;
         if buf.len() < core::mem::size_of::<TOKEN_MANDATORY_LABEL>() {
             return Err(Error::BadTokenInfoSize {
                 class: "TokenIntegrityLevel",
@@ -203,7 +216,7 @@ impl Token {
 
 impl Drop for Token {
     fn drop(&mut self) {
-        if !self.handle.is_invalid() {
+        if !self.handle.is_null() {
             unsafe {
                 let _ = CloseHandle(self.handle);
             }
@@ -215,7 +228,7 @@ impl Drop for Token {
 struct HandleGuard(HANDLE);
 impl Drop for HandleGuard {
     fn drop(&mut self) {
-        if !self.0.is_invalid() {
+        if !self.0.is_null() {
             unsafe {
                 let _ = CloseHandle(self.0);
             }
@@ -226,7 +239,7 @@ impl Drop for HandleGuard {
 /// Two-call idiom for variable-length `GetTokenInformation`.
 fn get_token_info_var(
     handle: HANDLE,
-    class: windows::Win32::Security::TOKEN_INFORMATION_CLASS,
+    class: TOKEN_INFORMATION_CLASS,
     label: &'static str,
 ) -> Result<Vec<u8>> {
     let mut needed: u32 = 0;
@@ -234,19 +247,21 @@ fn get_token_info_var(
         // First call: pass length 0 to learn the required size. This
         // deliberately errors with ERROR_INSUFFICIENT_BUFFER; we ignore that
         // failure and act on `needed`.
-        let _ = GetTokenInformation(handle, class, None, 0, &mut needed);
+        let _ = GetTokenInformation(handle, class, core::ptr::null_mut(), 0, &mut needed);
         if needed == 0 {
             return Err(Error::BadTokenInfoSize { class: label });
         }
         let mut buf = vec![0u8; needed as usize];
-        GetTokenInformation(
+        let ok = GetTokenInformation(
             handle,
             class,
-            Some(buf.as_mut_ptr() as *mut _),
+            buf.as_mut_ptr() as *mut c_void,
             needed,
             &mut needed,
-        )
-        .map_err(|e| Error::win32("GetTokenInformation", e))?;
+        );
+        if ok == 0 {
+            return Err(Error::from_last_os_error("GetTokenInformation"));
+        }
         Ok(buf)
     }
 }

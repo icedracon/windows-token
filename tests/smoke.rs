@@ -7,7 +7,7 @@ use windows_token::{Privilege, SecurityImpersonationLevel, Token, TokenType};
 #[test]
 fn open_current_process_token() {
     let tok = Token::open_current_process().expect("open current-process token");
-    assert!(!tok.as_raw().is_invalid(), "expected a live token handle");
+    assert!(!tok.as_raw().is_null(), "expected a live token handle");
 }
 
 #[test]
@@ -32,7 +32,7 @@ fn duplicate_round_trip_impersonation_and_revert() {
             SecurityImpersonationLevel::Impersonation,
         )
         .expect("duplicate as impersonation");
-    assert!(!dup.as_raw().is_invalid());
+    assert!(!dup.as_raw().is_null());
 
     // Impersonate, then let the guard drop → RevertToSelf runs. If the guard
     // failed to revert, subsequent OpenProcessToken(GetCurrentProcess()) would
