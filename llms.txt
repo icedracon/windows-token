@@ -7,6 +7,8 @@
 - [API documentation](https://docs.rs/windows-token)
 - [Ecosystem map](https://github.com/icedracon/win32-min/blob/master/ECOSYSTEM.md)
 - [ABI foundation](https://github.com/icedracon/win32-min)
+- [Current-token workflow](https://github.com/icedracon/windows-token/blob/main/examples/current_identity.rs)
+- [Research workflow index](https://github.com/icedracon/win32-min/blob/master/RESEARCH-WORKFLOWS.md)
 
 Dropping `ImpersonationGuard` calls `RevertToSelf`, including during unwinding.
 The crate is Windows-only and does not currently expose named SID lookup,

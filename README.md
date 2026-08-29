@@ -52,6 +52,20 @@ fn main() -> windows_token::Result<()> {
 }
 ```
 
+## Research workflow
+
+Inspect the current identity and integrity level, then prove that duplicated
+self-impersonation is reverted by the RAII guard:
+
+```powershell
+cargo run --example current_identity
+```
+
+This workflow does not require elevation, enable a privilege, or impersonate a
+different account. See the ecosystem's complete
+[`RESEARCH-WORKFLOWS.md`](https://github.com/icedracon/win32-min/blob/master/RESEARCH-WORKFLOWS.md)
+for permission and scope boundaries.
+
 ## What works / what does not (this version)
 
 - Working:
