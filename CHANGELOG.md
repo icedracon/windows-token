@@ -4,6 +4,7 @@
 
 - Added a runnable current-token identity and scoped self-impersonation
   research workflow.
+- Added scheduled RustSec advisory auditing and weekly dependency monitoring.
 
 ## 0.2.1 - 2026-08-29
 
