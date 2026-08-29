@@ -12,11 +12,10 @@
 //!
 //! ## Status
 //!
-//! **0.1.0-dev — pre-alpha.** Skeleton with the intended API surface, a
-//! partial implementation of the core primitives (open / duplicate / adjust /
-//! impersonate / query user + integrity), and structural + smoke + round-trip
-//! tests. Not yet exercised against a live DC. `OpenThreadToken` and named-SID
-//! lookup (`LookupAccountSidW`) are not yet wired.
+//! The 0.2 series implements process-token open, token duplication, privilege
+//! adjustment, scoped impersonation, user SID, and integrity-level queries on
+//! top of `win32-min`. Named-SID lookup and direct `OpenThreadToken` helpers
+//! remain outside the current safe surface.
 //!
 //! ## Example
 //!

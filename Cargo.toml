@@ -1,19 +1,20 @@
 [package]
 name = "windows-token"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
+rust-version = "1.85"
 license = "MIT"
 authors = ["zevs"]
-description = "RAII wrappers over Win32 process/thread tokens: OpenProcessToken, DuplicateTokenEx, ImpersonateLoggedOnUser, AdjustTokenPrivileges. Drop = RevertToSelf. Built on win32-min (hand-rolled FFI, no windows-rs)."
+description = "Safe Rust wrappers for Windows access tokens, privileges, duplication, and scoped impersonation, built on win32-min."
 repository = "https://github.com/icedracon/windows-token"
 homepage = "https://github.com/icedracon/windows-token"
 documentation = "https://docs.rs/windows-token"
 readme = "README.md"
-keywords = ["windows", "token", "impersonation", "privilege", "raii"]
+keywords = ["windows", "access-token", "impersonation", "privilege", "security"]
 categories = ["os::windows-apis", "authentication", "api-bindings"]
 
 [target.'cfg(windows)'.dependencies]
-win32-min = { version = "0.1", features = ["security-token"] }
+win32-min = { version = "0.1.2", features = ["security-token"] }
 thiserror = "2"
 
 [lib]

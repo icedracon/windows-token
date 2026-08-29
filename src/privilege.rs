@@ -60,7 +60,7 @@ impl Privilege {
     }
 }
 
-/// Snapshot returned by [`Token::enable_privilege`] so the caller can restore
+/// Snapshot returned by [`crate::Token::enable_privilege`] so the caller can restore
 /// the prior state. `attributes` is the previous privilege attribute bitmask
 /// (0 = disabled, `SE_PRIVILEGE_ENABLED` = enabled, etc.).
 #[derive(Debug, Clone)]

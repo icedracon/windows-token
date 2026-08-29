@@ -11,9 +11,9 @@ use core::ffi::c_void;
 use win32_min::foundation::{CloseHandle, HANDLE};
 use win32_min::security_token::{
     DuplicateTokenEx, GetCurrentProcess, GetTokenInformation, OpenProcess, OpenProcessToken,
-    SECURITY_IMPERSONATION_LEVEL, TOKEN_INFORMATION_CLASS, TOKEN_MANDATORY_LABEL, TOKEN_TYPE,
-    TOKEN_USER, PROCESS_QUERY_LIMITED_INFORMATION, TOKEN_ADJUST_PRIVILEGES, TOKEN_ALL_ACCESS,
-    TOKEN_DUPLICATE, TOKEN_QUERY,
+    PROCESS_QUERY_LIMITED_INFORMATION, SECURITY_IMPERSONATION_LEVEL, TOKEN_ADJUST_PRIVILEGES,
+    TOKEN_ALL_ACCESS, TOKEN_DUPLICATE, TOKEN_INFORMATION_CLASS, TOKEN_MANDATORY_LABEL, TOKEN_QUERY,
+    TOKEN_TYPE, TOKEN_USER,
 };
 
 /// TOKEN_TYPE alias — primary tokens are the ones you can assign to a new
@@ -45,7 +45,9 @@ pub enum SecurityImpersonationLevel {
 impl SecurityImpersonationLevel {
     fn as_win32(self) -> SECURITY_IMPERSONATION_LEVEL {
         match self {
-            SecurityImpersonationLevel::Anonymous => SECURITY_IMPERSONATION_LEVEL::SecurityAnonymous,
+            SecurityImpersonationLevel::Anonymous => {
+                SECURITY_IMPERSONATION_LEVEL::SecurityAnonymous
+            }
             SecurityImpersonationLevel::Identification => {
                 SECURITY_IMPERSONATION_LEVEL::SecurityIdentification
             }
@@ -179,11 +181,7 @@ impl Token {
 
     /// `GetTokenInformation(TokenUser)` → owned `Sid`.
     pub fn user_sid(&self) -> Result<Sid> {
-        let buf = get_token_info_var(
-            self.handle,
-            TOKEN_INFORMATION_CLASS::TokenUser,
-            "TokenUser",
-        )?;
+        let buf = get_token_info_var(self.handle, TOKEN_INFORMATION_CLASS::TokenUser, "TokenUser")?;
         if buf.len() < core::mem::size_of::<TOKEN_USER>() {
             return Err(Error::BadTokenInfoSize { class: "TokenUser" });
         }

@@ -2,6 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/windows-token.svg)](https://crates.io/crates/windows-token)
 [![Docs.rs](https://docs.rs/windows-token/badge.svg)](https://docs.rs/windows-token)
+[![CI](https://github.com/icedracon/windows-token/actions/workflows/ci.yml/badge.svg)](https://github.com/icedracon/windows-token/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 RAII wrappers over the Win32 access-token surface — `OpenProcessToken`,
@@ -13,8 +14,11 @@ here it is structurally impossible.
 
 ## Status
 
-**`0.1.0-dev`** — pre-alpha, expect breaking changes before `0.1.0`. Part of
-the [icedracon](https://github.com/icedracon) Rust offensive-AD ecosystem.
+**`0.2` tested companion crate.** The token, privilege, duplication, SID, and
+scoped impersonation paths are implemented on top of `win32-min`; APIs may
+still evolve before 1.0. See the central
+[`win32-min` ecosystem map](https://github.com/icedracon/win32-min/blob/master/ECOSYSTEM.md)
+for compatibility and maturity information.
 
 ## What it does
 
@@ -69,17 +73,15 @@ fn main() -> windows_token::Result<()> {
 
 ## Dependencies
 
-S-tier posture — narrow feature set on `windows`, no serde / log / async
-runtime.
-
-- `windows` 0.58 with only
-  `Win32_Security`, `Win32_System_Threading`,
-  `Win32_Security_Authentication_Identity`, `Win32_Foundation` enabled.
-- `windows-core` 0.58 for `Result` / `Error` interop.
-- `thiserror` 2 for error boilerplate.
+- `win32-min >= 0.1.2, < 0.2` with only `security-token` enabled.
+- `thiserror` 2 for the public error taxonomy.
+- No async runtime, serialization framework, logging facade, or generated
+  Windows bindings.
 
 ## Related icedracon crates
 
+- [`win32-min`](https://github.com/icedracon/win32-min) — verified,
+  dependency-free Win32 ABI foundation used by this crate.
 - [`windows-lsa`](https://github.com/icedracon/windows-lsa) — LSA ticket
   cache access; typical pattern is `impersonate_on_thread` then read the
   target LUID's cache.
@@ -89,8 +91,8 @@ runtime.
 - [`windows-scm`](https://github.com/icedracon/windows-scm) — local Service
   Control Manager wrapper, for the SYSTEM-side of the same workflows.
 
-Together these enable "run adhammer as yourself" and impersonation-based
-lateral-movement tooling without dragging in spec-vector captures or popular Kerberos clients.
+Together these cover identity, authentication, and local administration
+workflows for Windows security research and defensive tooling.
 
 ## License
 
